@@ -13,7 +13,7 @@ import java.util.Optional;
 @Repository
 public interface RoomRepository extends JpaRepository<Room, Long> {
     Page<Room> findBySchoolId(Long schoolId, Pageable pageable);
-    List<Room> findBySchoolIdOrderByRoomTypeAscNameAsc(Long schoolId);
+    List<Room> findBySchoolIdOrderByTypeAscNameAsc(Long schoolId);
     List<Room> findBySchoolIdAndType(Long schoolId, RoomType type);
     Optional<Room> findBySchoolIdAndId(Long schoolId, Long id);
     boolean existsBySchoolIdAndName(Long schoolId, String name);
