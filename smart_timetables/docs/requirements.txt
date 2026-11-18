@@ -1,0 +1,294 @@
+=====================================================================
+AUTOMATIC SCHOOL TIMETABLE SYSTEM FOR SRI LANKAN SCHOOLS
+Requirements Specification (Functional and Non-Functional)
+Version 1.0 - 17 November 2026
+=====================================================================
+
+1. PURPOSE
+---------------------------------------------------------------------
+Build a web-based, multi-school (SaaS) system that automatically
+generates conflict-free school timetables for Sri Lankan schools,
+lets coordinators review and adjust them, and publishes printable
+timetables for classes, teachers and rooms.
+
+2. SCOPE AND DELIVERY PLAN
+---------------------------------------------------------------------
+Phase 1 (MVP, single school):
+  - Core data entry and Excel import
+  - Automatic generation with hard constraints and basic soft constraints
+  - Manual editing with clash detection
+  - Printable output
+Phase 2:
+  - Religion splits, O/L baskets, A/L streams and combined classes
+  - Rooms and labs, double periods, lock-and-resolve
+  - Sinhala / Tamil / English interface and print output
+Phase 3:
+  - Multi-school tenancy, onboarding templates, billing
+  - Daily teacher absence and substitution management
+  - Zonal / provincial read-only views
+
+3. TECHNOLOGY STACK (DECIDED)
+---------------------------------------------------------------------
+  Frontend      : React (drag-and-drop timetable grid)
+  API           : Spring Boot, JWT authentication, role-based access
+  Database      : PostgreSQL (school_id on every tenant table, row-level
+                  security, Flyway migrations)
+  Solver        : Java service using Timefold Solver, run as a separate
+                  worker
+  Job queue     : Redis
+  Storage       : Object storage for exports
+  PDF output    : Server-side PDF generation (Sinhala/Tamil fonts embedded)
+
+4. USER ROLES
+---------------------------------------------------------------------
+  Platform Admin : Manages schools and subscriptions (Phase 3)
+  School Admin   : Manages school settings, users and data
+  Coordinator    : Builds, edits and publishes timetables
+  Teacher        : Views own timetable, requests changes, sees
+                   substitutions
+
+5. FUNCTIONAL REQUIREMENTS
+---------------------------------------------------------------------
+
+5.1 Authentication and Access
+  FR-1.1  Users log in with email and password; sessions use JWT.
+  FR-1.2  Access is controlled by role (see section 4).
+  FR-1.3  Users can reset their password.
+  FR-1.4  A user can only see and change data of their own school.
+
+5.2 School Setup
+  FR-2.1  School admin records school details (name, type, zone,
+          district, province, census number).
+  FR-2.2  Define academic years and terms (three terms per year).
+  FR-2.3  Define the weekly time grid: school days, periods per day,
+          start/end times, intervals and assemblies.
+  FR-2.4  Allow a different grid for specific days (e.g., shorter
+          Friday).
+  FR-2.5  Record holidays, Poya days, exam weeks and events.
+
+5.3 Master Data
+  FR-3.1  Manage grades (1 to 13), classes, mediums (Sinhala, Tamil,
+          English) and A/L streams (Science, Commerce, Arts,
+          Technology).
+  FR-3.2  Manage subjects with names in English, Sinhala and Tamil, and
+          flags for religion and practical subjects.
+  FR-3.3  Manage teachers, including staff number, short code,
+          maximum periods per day and per week, and active status.
+  FR-3.4  Record which subjects and mediums each teacher can teach.
+  FR-3.5  Record teacher availability (unavailable and preferred
+          slots).
+  FR-3.6  Manage rooms and labs with type and capacity.
+  FR-3.7  Assign class teachers to classes.
+  FR-3.8  Import teachers, classes, subjects and lessons from Excel,
+          with a validation report showing errors by row.
+  FR-3.9  Export all master data back to Excel.
+
+5.4 Lessons and Grouping
+  FR-4.1  Define lessons: class(es), subject, teacher, periods per
+          week, double-period (block) size and maximum per day.
+  FR-4.2  Define parallel lesson groups so selected lessons occupy
+          the same slots (religion, O/L baskets, A/L electives).
+  FR-4.3  Allow one lesson to serve several classes (combined A/L
+          classes) or part of a class (religion split).
+  FR-4.4  Specify required room type or a fixed room for a lesson.
+
+5.5 Constraints
+  Hard constraints (must never be broken):
+  FR-5.1  A teacher teaches at most one lesson per slot.
+  FR-5.2  A class attends at most one lesson per slot, except lessons
+          in the same parallel group.
+  FR-5.3  A room hosts at most one lesson per slot.
+  FR-5.4  Each lesson receives exactly its required periods per week.
+  FR-5.5  No lesson is placed in a slot where its teacher is
+          unavailable.
+  FR-5.6  Double-period lessons occupy consecutive teaching slots on
+          the same day, not across an interval.
+  FR-5.7  Lessons are placed only in teaching slots.
+  FR-5.8  Room type, capacity and fixed-room requirements are met.
+  FR-5.9  Teacher daily and weekly period limits are respected.
+  FR-5.10 Pinned (locked) entries stay where the coordinator put them.
+
+  Soft constraints (optimised, with configurable weights):
+  FR-5.11 Spread each subject across different days; avoid more than
+          the allowed periods per day.
+  FR-5.12 Avoid heavy subjects (e.g., Mathematics, Science) in the
+          last period.
+  FR-5.13 Minimise teacher gaps (free periods between lessons).
+  FR-5.14 Balance teacher workload across days.
+  FR-5.15 Honour teacher preferred slots.
+  FR-5.16 Prefer the class teacher in the first period of the day.
+  FR-5.17 The school admin can enable, disable and re-weight each soft
+          constraint, and mark selected ones as hard.
+
+5.6 Timetable Generation
+  FR-6.1  Coordinator starts generation for a term; the job runs in
+          the background through the queue.
+  FR-6.2  Show job status (queued, running, done, failed, cancelled)
+          and live progress with best score so far.
+  FR-6.3  Allow cancelling a running job.
+  FR-6.4  Apply a configurable time limit and return the best
+          solution found.
+  FR-6.5  If the problem cannot be fully satisfied, return a clear
+          report of the unmet constraints and the lessons involved.
+  FR-6.6  Before solving, run a data check (e.g., teacher overload,
+          too many periods for the available slots) and report issues.
+  FR-6.7  Each result is saved as a timetable version.
+
+5.7 Review and Manual Editing
+  FR-7.1  Display timetables by class, teacher and room in a grid.
+  FR-7.2  Support drag-and-drop moves and swaps of lessons.
+  FR-7.3  Show conflicts instantly, with the reason, when a move
+          breaks a constraint.
+  FR-7.4  Allow pinning and unpinning lessons.
+  FR-7.5  Allow re-solving the remaining lessons around pinned ones.
+  FR-7.6  Provide undo and redo during an editing session.
+  FR-7.7  Keep multiple versions (draft, published, archived), with
+          comparison and rollback.
+  FR-7.8  Allow only one published version per school per term.
+
+5.8 Output and Sharing
+  FR-8.1  Export class, teacher and room timetables to PDF and Excel.
+  FR-8.2  Printable layouts for notice boards and for individual
+          teachers.
+  FR-8.3  Produce output in Sinhala, Tamil and English with correct
+          font rendering.
+  FR-8.4  Teachers can view their own published timetable on mobile.
+  FR-8.5  Share a read-only link to a published timetable.
+
+5.9 Substitutions (Phase 3)
+  FR-9.1  Record teacher absences by date.
+  FR-9.2  Suggest available substitute teachers for affected lessons,
+          ranked by qualification and current load.
+  FR-9.3  Record the assigned substitute and notify them.
+  FR-9.4  Report substitution counts per teacher.
+
+5.10 Multi-School Administration (Phase 3)
+  FR-10.1 Platform admin creates and deactivates schools.
+  FR-10.2 Provide setup templates by school type (1AB, 1C, Type 2,
+          Type 3, private).
+  FR-10.3 Manage subscriptions and billing per school.
+  FR-10.4 Optional zonal/provincial read-only reporting across
+          schools.
+
+5.11 Audit
+  FR-11.1 Log important actions (logins, imports, generations,
+          publishing, edits) with user and time.
+
+6. NON-FUNCTIONAL REQUIREMENTS
+---------------------------------------------------------------------
+
+6.1 Performance
+  NFR-1.1 Pages and API reads respond within 2 seconds for normal use.
+  NFR-1.2 Conflict checks during drag-and-drop respond within 300 ms.
+  NFR-1.3 Generation for a typical school (up to 60 teachers and 40
+          classes) finishes a first feasible solution within 2
+          minutes and a good solution within the configured limit
+          (default 5 minutes).
+  NFR-1.4 Solver workers scale independently of the API.
+
+6.2 Scalability
+  NFR-2.1 Support at least 500 schools and 100 concurrent users in the
+          first version, with a path to scale beyond that.
+  NFR-2.2 Handle term-start peaks by adding solver workers.
+
+6.3 Security
+  NFR-3.1 Passwords hashed with a strong algorithm (bcrypt or Argon2).
+  NFR-3.2 All traffic over HTTPS.
+  NFR-3.3 Tenant isolation enforced in both the application and the
+          database (row-level security).
+  NFR-3.4 Role-based authorisation on every endpoint.
+  NFR-3.5 Protection against common web attacks (injection, XSS, CSRF,
+          brute-force login).
+  NFR-3.6 Uploaded files scanned and size-limited.
+
+6.4 Privacy and Compliance
+  NFR-4.1 Store only the personal data needed (teacher names, staff
+          numbers, contact details); do not store student-level data.
+  NFR-4.2 Comply with Sri Lanka's Personal Data Protection Act:
+          consent, access, correction and deletion on request.
+  NFR-4.3 A school's data can be exported and deleted when it leaves
+          the service.
+
+6.5 Reliability and Availability
+  NFR-5.1 Target 99.5% uptime for the web service.
+  NFR-5.2 Automated daily database backups, kept for 30 days, with
+          tested restore.
+  NFR-5.3 A failed or crashed solve job never corrupts existing data;
+          jobs can be retried.
+  NFR-5.4 Edits are saved safely so no timetable work is lost on
+          connection loss.
+
+6.6 Usability
+  NFR-6.1 Interface available in Sinhala, Tamil and English.
+  NFR-6.2 A new school can complete setup and generate a first
+          timetable in under one day using Excel import.
+  NFR-6.3 Clear, plain-language error messages that point to the
+          exact data row or constraint at fault.
+  NFR-6.4 Works on current desktop browsers; the teacher view works
+          on mobile phones.
+  NFR-6.5 Usable on slow connections (lightweight pages, pagination,
+          compressed assets).
+
+6.7 Maintainability
+  NFR-7.1 Database changes delivered as versioned migrations.
+  NFR-7.2 Constraints are modular so new rules can be added without
+          rewriting the solver.
+  NFR-7.3 Automated unit tests for every constraint, and integration
+          tests for the solve flow.
+  NFR-7.4 Structured logging and monitoring for API and workers.
+
+6.8 Portability and Deployment
+  NFR-8.1 Containerised deployment (Docker) for API, workers, Redis
+          and database.
+  NFR-8.2 Hosted in a region with good latency for Sri Lanka
+          (e.g., Singapore or India).
+  NFR-8.3 Environment-based configuration; no secrets in code.
+
+6.9 Data Quality
+  NFR-9.1 Referential integrity enforced by the database.
+  NFR-9.2 Imports are validated and reported before any data is
+          committed.
+
+7. OUT OF SCOPE (INITIAL RELEASE)
+---------------------------------------------------------------------
+  - Student attendance, grades, fees or student information system
+  - Student-level subject choice management (only class and group
+    sizes are used)
+  - Learning management or online classes
+  - Native mobile apps (mobile web only)
+  - Standalone offline desktop edition
+  - Integration with government education systems
+  - Automatic re-timetabling during a running term (only manual edits
+    and substitutions)
+
+8. ASSUMPTIONS
+---------------------------------------------------------------------
+  - Schools can provide teacher, class and subject data in Excel or
+    can enter it manually.
+  - Each school works a fixed weekly cycle (same timetable every
+    week within a term).
+  - Internet access is available at the school at least during setup
+    and generation.
+  - A coordinator reviews every generated timetable before it is
+    published.
+
+9. ACCEPTANCE CRITERIA (MVP)
+---------------------------------------------------------------------
+  - A pilot school's real data is imported with no manual rework
+    beyond the reported validation errors.
+  - The generated timetable has zero hard-constraint violations.
+  - A coordinator can adjust the result by drag-and-drop and print
+    class and teacher timetables.
+  - Results are accepted by the pilot school's principal or
+    coordinator as usable without rebuilding by hand.
+
+10. OPEN ITEMS
+---------------------------------------------------------------------
+  - Pricing model and billing provider
+  - Exact Sinhala and Tamil fonts for print
+  - Whether zonal/provincial reporting is needed at launch
+  - Pilot school selection
+
+=====================================================================
+END OF DOCUMENT
+=====================================================================

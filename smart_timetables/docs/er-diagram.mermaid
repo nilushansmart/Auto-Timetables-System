@@ -1,0 +1,188 @@
+erDiagram
+    school ||--o{ app_user : has
+    school ||--o{ teacher : employs
+    school ||--o{ academic_year : runs
+    school ||--o{ time_slot : defines
+    school ||--o{ grade : offers
+    school ||--o{ stream : offers
+    school ||--o{ subject : teaches
+    school ||--o{ room : owns
+    school ||--o{ constraint_config : configures
+    school ||--o{ calendar_event : schedules
+
+    academic_year ||--o{ term : contains
+    academic_year ||--o{ class_group : has
+    academic_year ||--o{ lesson : plans
+    academic_year ||--o{ lesson_group : plans
+
+    grade ||--o{ class_group : contains
+    stream |o--o{ class_group : "A/L only"
+    medium ||--o{ class_group : "taught in"
+    teacher |o--o{ class_group : "class teacher"
+    teacher |o--o| app_user : "login for"
+
+    teacher ||--o{ teacher_subject : qualified
+    subject ||--o{ teacher_subject : "taught by"
+    medium ||--o{ teacher_subject : in
+    teacher ||--o{ teacher_availability : sets
+    time_slot ||--o{ teacher_availability : for
+
+    grade ||--o{ subject_basket : has
+    subject_basket ||--o{ basket_subject : offers
+    subject ||--o{ basket_subject : "in basket"
+
+    lesson_group |o--o{ lesson : "runs in parallel"
+    subject ||--o{ lesson : of
+    teacher ||--o{ lesson : teaches
+    room |o--o{ lesson : "fixed room"
+    lesson ||--o{ lesson_class : attended_by
+    class_group ||--o{ lesson_class : attends
+
+    term ||--o{ solve_job : solved_for
+    app_user |o--o{ solve_job : requests
+    solve_job |o--o{ timetable_version : produces
+    term ||--o{ timetable_version : has
+    timetable_version ||--o{ timetable_entry : contains
+    lesson ||--o{ timetable_entry : placed_as
+    time_slot ||--o{ timetable_entry : at
+    room |o--o{ timetable_entry : in
+
+    teacher ||--o{ teacher_absence : has
+    teacher_absence ||--o{ substitution : covered_by
+    timetable_entry ||--o{ substitution : for
+    teacher ||--o{ substitution : substitutes
+
+    school {
+        bigint id PK
+        string census_no
+        string name
+        enum type
+        string province
+        string zone
+    }
+    app_user {
+        bigint id PK
+        bigint school_id FK
+        bigint teacher_id FK
+        string email
+        enum role
+    }
+    teacher {
+        bigint id PK
+        bigint school_id FK
+        string staff_no
+        string full_name
+        int max_periods_day
+        int max_periods_week
+    }
+    academic_year {
+        bigint id PK
+        bigint school_id FK
+        int year
+    }
+    term {
+        bigint id PK
+        bigint academic_year_id FK
+        int term_no
+        date start_date
+        date end_date
+    }
+    time_slot {
+        bigint id PK
+        bigint school_id FK
+        int day_of_week
+        int period_no
+        time start_time
+        time end_time
+        enum slot_type
+    }
+    grade {
+        bigint id PK
+        bigint school_id FK
+        int grade_no
+        enum level
+    }
+    stream {
+        bigint id PK
+        bigint school_id FK
+        string name
+    }
+    class_group {
+        bigint id PK
+        bigint academic_year_id FK
+        bigint grade_id FK
+        smallint medium_id FK
+        bigint stream_id FK
+        bigint class_teacher_id FK
+        string name
+    }
+    subject {
+        bigint id PK
+        bigint school_id FK
+        string code
+        string name_en
+        string name_si
+        string name_ta
+        bool is_religion
+    }
+    room {
+        bigint id PK
+        bigint school_id FK
+        string name
+        enum type
+        int capacity
+    }
+    lesson_group {
+        bigint id PK
+        bigint academic_year_id FK
+        enum type
+        string name
+    }
+    lesson {
+        bigint id PK
+        bigint subject_id FK
+        bigint teacher_id FK
+        bigint lesson_group_id FK
+        int periods_per_week
+        int block_size
+        int max_per_day
+        enum required_room_type
+    }
+    lesson_class {
+        bigint lesson_id PK
+        bigint class_group_id PK
+        int student_count
+    }
+    solve_job {
+        bigint id PK
+        bigint term_id FK
+        enum status
+        int best_hard_score
+        int best_soft_score
+    }
+    timetable_version {
+        bigint id PK
+        bigint term_id FK
+        bigint solve_job_id FK
+        string name
+        enum status
+    }
+    timetable_entry {
+        bigint id PK
+        bigint version_id FK
+        bigint lesson_id FK
+        bigint time_slot_id FK
+        bigint room_id FK
+        bool is_pinned
+    }
+    teacher_absence {
+        bigint id PK
+        bigint teacher_id FK
+        date absent_date
+    }
+    substitution {
+        bigint id PK
+        bigint absence_id FK
+        bigint timetable_entry_id FK
+        bigint substitute_teacher_id FK
+    }
