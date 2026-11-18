@@ -7,5 +7,7 @@
 			"path": "../timetables-be"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"java.configuration.updateBuildConfiguration": "interactive"
+	}
 }
