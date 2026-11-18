@@ -1,13 +1,14 @@
 package me.nilushan.timetables_be;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
-@SpringBootTest
 class TimetablesBeApplicationTests {
 
 	@Test
-	void contextLoads() {
+	void printHash() {
+		String hash = new BCryptPasswordEncoder().encode("admin123");
+		System.out.println("BCRYPT_ADMIN123=" + hash);
 	}
 
 }

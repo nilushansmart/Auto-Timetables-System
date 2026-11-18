@@ -19,7 +19,7 @@ VALUES (
     1,
     NULL,
     'admin@demoschool.lk',
-    '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAf270Cq',
+    '$2a$10$hM6YSTX/A2gEG3E5QThXxu/jhdErwrF2sXQmcxvTCLUA5zPKSNIiK',
     'Demo Administrator',
     'SCHOOL_ADMIN',
     true,
